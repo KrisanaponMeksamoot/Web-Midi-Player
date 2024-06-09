@@ -67,6 +67,7 @@ class Midifile {
                 track.events.push(new MetaEvent(dt, type, new Uint8Array(view.buffer, view.byteOffset+ofs)));
                 ofs += len;
             } else {
+                ofs++;
                 switch (type & 0xF0) {
                     case 0x80:
                     case 0x90:
@@ -110,8 +111,12 @@ class MidiSequence {
 }
 
 class MidiTrack {
-    constructor() {
-        this.events = [];
+    /**
+     * 
+     * @param {MidiTrackEvent[]} events 
+     */
+    constructor(events = []) {
+        this.events = events;
     }
 }
 
@@ -168,5 +173,125 @@ class MetaEvent extends MidiTrackEvent {
 class MidiMulformError extends Error {
     constructor(message) {
         super(message);
+    }
+}
+
+class SoundBank {
+    constructor() {
+
+    }
+}
+
+class SimpleMidiSequencer {
+    /**
+     * @param {MidiSequence} sequence
+     * @param {SoundBank} soundbank
+     */
+    constructor(sequence, soundbank) {
+        this.seq = sequence;
+        this.loop_timeout = -1;
+        this.event_pos = Array(this.seq.tracks.length).fill(0);
+        this.event_tl = Array(this.seq.tracks.length).fill(0);
+        this.sb = soundbank;
+        this.channels = Array(16).fill(null).map(_=>Array(127).fill(null));
+        this.currentInterval = 0;
+        this.playing = false;
+    }
+    _tick(this0 = this) {
+        if (!this0.playing)
+            return;
+        let tl = this0.seq.tracks.length;
+        for (let i=0;i<this0.seq.tracks.length;i++) {
+            if (this0.event_pos[i] >= this0.seq.tracks[i].events.length) {
+                tl--;
+                this0.event_tl[i] = Infinity;
+                continue;
+            }
+            if (this0.event_tl[i] > 0)
+                continue;
+            this0._process_event(this0.seq.tracks[i].events[this0.event_pos[i]++]);
+            while (this0.event_pos[i] < this0.seq.tracks[i].events.length && this0.seq.tracks[i].events[this0.event_pos[i]].dt == 0)
+                this0._process_event(this0.seq.tracks[i].events[this0.event_pos[i]++]);
+            if (this0.event_pos[i] >= this0.seq.tracks[i].events.length) {
+                tl--;
+                this0.event_tl[i] = Infinity;
+                continue;
+            }
+            this0.event_tl[i] = this0.seq.tracks[i].events[this0.event_pos[i]].dt;
+        }
+        if (tl > 0) {
+            let ndt = Math.min(...this0.event_tl);
+            for (let i in this0.event_tl)
+                this0.event_tl[i] -= ndt;
+            // console.log(this0.currentInterval, ndt);
+            this0.loop_timeout = setTimeout(this0._tick, this0.currentInterval * ndt, this0);
+        } else {
+            this0.stop();
+        }
+    }
+    /**
+     * 
+     * @param {MidiTrackEvent} e 
+     */
+    _process_event(e) {
+        if (e instanceof MetaEvent) {
+            switch (e.type) {
+                case 0x51:
+                    this.currentInterval = e.data[0]*1000/this.seq.division;
+                    break;
+            }
+        } else if (e instanceof MidiEvent) {
+            switch (e.status & 0xF0) {
+                case 0x80:
+                    this._stop_sound(e.status & 0x0F, e.data, e.data2);
+                    break;
+                case 0x90:
+                    this._play_sound(e.status & 0x0F, e.data, e.data2);
+                    break;
+                case 0xC0:
+                    this._change_patch(e.status & 0x0F, e.data);
+                    break;
+            }
+        }
+    }
+    _change_patch(chan, patch) {
+        
+    }
+    _play_sound(chan, key, vel) {
+        let a = this.channels[chan][key];
+        if (a == null) {
+            a = new Audio(`./samples/0.wav`);
+            a.playbackRate = Math.min(Math.max(Math.pow(2, (key-72)/12), 0.25), 4.0);
+            a.preservesPitch = false;
+            this.channels[chan][key] = a;
+        }
+        a.volume = vel / 127;
+        a.currentTime = 0;
+        a.play();
+    }
+    _stop_sound(chan, key, vel) {
+        let a = this.channels[chan][key];
+        if (a == null) {
+            a = new Audio(`./samples/0.wav`);
+            a.playbackRate = Math.min(Math.max(Math.pow(2, (key-72)/12), 0.25), 4.0);
+            a.preservesPitch = false;
+            this.channels[chan][key] = a;
+        }
+        a.pause();
+    }
+    start() {
+        this.event_pos.fill(0);
+        this.event_tl.fill(0);
+        this.currentInterval = 60000/this.seq.division/120;
+        this.playing = true;
+        this.loop_timeout = setTimeout(this._tick, this.currentInterval, this);
+    }
+    isPlaying() {
+        return this.loop_timeout != -1;
+    }
+    stop() {
+        clearTimeout(this.loop_timeout);
+        this.loop_timeout = -1;
+        this.playing = false;
     }
 }
