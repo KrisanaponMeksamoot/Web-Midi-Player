@@ -23,6 +23,8 @@ class Midifile {
             seq.tracks[i] = this._parseMTrk(new DataView(buffer, ofs+8, len));
             ofs += 8+len;
         }
+        if (ofs < buffer.byteLength)
+            console.warn(`Unreaded bytes ${ofs}-${buffer.byteLength}`);
         return seq;
     }
     /**
@@ -41,7 +43,7 @@ class Midifile {
                 dt |= rb & 0x7f;
             } while ((rb & 0x80) > 0);
 
-            let type = view.getUint8(ofs);
+            let type = view.getUint8(ofs++);
             if (type == 0xF0 || type == 0xF7) {
                 let len = 0;
                 do {
@@ -49,25 +51,21 @@ class Midifile {
                     len <<= 7;
                     len |= rb & 0x7f;
                 } while ((rb & 0x80) > 0);
-                track.events.push(new SysexEvent(dt, type, new Uint8Array(view.buffer, view.byteOffset+ofs)));
+                track.events.push(new SysexEvent(dt, type, new Uint8Array(view.buffer, view.byteOffset+ofs, len)));
                 ofs += len;
             } else if (type == 0xFF) {
-                type = 0;
-                do {
-                    rb = view.getUint8(ofs++);
-                    type <<= 7;
-                    type |= rb & 0x7f;
-                } while ((rb & 0x80) > 0);
+                type = view.getUint8(ofs++);
+                if (type > 127)
+                    throw new MidiMulformError(`meta-event type > 127 at ${ofs+view.byteOffset}`);
                 let len = 0;
                 do {
                     rb = view.getUint8(ofs++);
                     len <<= 7;
                     len |= rb & 0x7f;
                 } while ((rb & 0x80) > 0);
-                track.events.push(new MetaEvent(dt, type, new Uint8Array(view.buffer, view.byteOffset+ofs)));
+                track.events.push(new MetaEvent(dt, type, new Uint8Array(view.buffer, view.byteOffset+ofs, len)));
                 ofs += len;
-            } else {
-                ofs++;
+            } else if ((type & 0xF0) >= 0x80) {
                 switch (type & 0xF0) {
                     case 0x80:
                     case 0x90:
@@ -92,6 +90,8 @@ class Midifile {
                         }
                     } break;
                 }
+            } else {
+                track.events.push(new MidiEvent(dt, type, view.getUint8(ofs++)));
             }
         }
         return track;
@@ -218,12 +218,13 @@ class SimpleMidiSequencer {
                 continue;
             }
             this0.event_tl[i] = this0.seq.tracks[i].events[this0.event_pos[i]].dt;
+            console.log(i, this0.event_pos[i]);
         }
         if (tl > 0) {
             let ndt = Math.min(...this0.event_tl);
             for (let i in this0.event_tl)
                 this0.event_tl[i] -= ndt;
-            // console.log(this0.currentInterval, ndt);
+            console.log("delay", this0.currentInterval, ndt, this0.currentInterval*ndt);
             this0.loop_timeout = setTimeout(this0._tick, this0.currentInterval * ndt, this0);
         } else {
             this0.stop();
@@ -246,10 +247,19 @@ class SimpleMidiSequencer {
                     this._stop_sound(e.status & 0x0F, e.data, e.data2);
                     break;
                 case 0x90:
+                case 0xA0:
                     this._play_sound(e.status & 0x0F, e.data, e.data2);
                     break;
                 case 0xC0:
                     this._change_patch(e.status & 0x0F, e.data);
+                    break;
+                case 0xD0:
+                    let mx = 0;
+                    let kys = this.channels[e.status & 0x0F].map(a=>a.volume);
+                    for (i in kys)
+                        if (kys[i] > kys[mx])
+                            mx = i;
+                    this._play_sound(e.status & 0x0F, mx, e.data);
                     break;
             }
         }
@@ -265,6 +275,7 @@ class SimpleMidiSequencer {
             a.preservesPitch = false;
             this.channels[chan][key] = a;
         }
+        console.log("play", chan, key, vel);
         a.volume = vel / 127;
         a.currentTime = 0;
         a.play();
@@ -277,6 +288,7 @@ class SimpleMidiSequencer {
             a.preservesPitch = false;
             this.channels[chan][key] = a;
         }
+        a.volume = 0;
         a.pause();
     }
     start() {
