@@ -34,6 +34,7 @@ class Midifile {
     static _parseMTrk(view) {
         let track = new MidiTrack();
         let ofs = 0;
+        let lastCmd;
         while (ofs < view.byteLength) {
             let rb;
             let dt = 0;
@@ -65,17 +66,19 @@ class Midifile {
                 } while ((rb & 0x80) > 0);
                 track.events.push(new MetaEvent(dt, type, new Uint8Array(view.buffer, view.byteOffset+ofs, len)));
                 ofs += len;
-            } else if ((type & 0xF0) >= 0x80) {
+            } else {
                 switch (type & 0xF0) {
                     case 0x80:
                     case 0x90:
                     case 0xA0:
                     case 0xB0:
                     case 0xE0:
+                        lastCmd = type;
                         track.events.push(new MidiEvent(dt, type, view.getUint8(ofs++), view.getUint8(ofs++)));
                         break;
                     case 0xC0:
                     case 0xD0:
+                        lastCmd = type;
                         track.events.push(new MidiEvent(dt, type, view.getUint8(ofs++)));
                         break;
                     case 0xF0: {
@@ -89,9 +92,9 @@ class Midifile {
                             track.events.push(new MidiEvent(dt, type));
                         }
                     } break;
+                    default:
+                        track.events.push(new MidiEvent(dt, lastCmd, type, view.getUint8(ofs++)));
                 }
-            } else {
-                track.events.push(new MidiEvent(dt, type, view.getUint8(ofs++)));
             }
         }
         return track;
@@ -242,6 +245,7 @@ class SimpleMidiSequencer {
                     break;
             }
         } else if (e instanceof MidiEvent) {
+            e.status |= 0x80;
             switch (e.status & 0xF0) {
                 case 0x80:
                     this._stop_sound(e.status & 0x0F, e.data, e.data2);
@@ -255,12 +259,14 @@ class SimpleMidiSequencer {
                     break;
                 case 0xD0:
                     let mx = 0;
-                    let kys = this.channels[e.status & 0x0F].map(a=>a.volume);
-                    for (i in kys)
+                    let kys = this.channels[e.status & 0x0F].map(a=>a==null?0:a.volume);
+                    for (let i in kys)
                         if (kys[i] > kys[mx])
                             mx = i;
                     this._play_sound(e.status & 0x0F, mx, e.data);
                     break;
+                default:
+                    console.warn(`Unimplemented: 0x${e.status.toString(16)}`);
             }
         }
     }
