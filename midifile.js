@@ -241,7 +241,7 @@ class SimpleMidiSequencer {
         if (e instanceof MetaEvent) {
             switch (e.type) {
                 case 0x51:
-                    this.currentInterval = e.data[0]*1000/this.seq.division;
+                    this.currentInterval = e.data[0]*64/this.seq.division;
                     break;
             }
         } else if (e instanceof MidiEvent) {
