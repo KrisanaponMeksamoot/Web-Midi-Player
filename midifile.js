@@ -218,9 +218,9 @@ class SimpleMidiSequencer extends EventTarget {
             }
             if (this.event_tl[i] > 0)
                 continue;
-            this._process_event(this.seq.tracks[i].events[this.event_pos[i]++]);
-            while (this.event_pos[i] < this.seq.tracks[i].events.length && this.seq.tracks[i].events[this.event_pos[i]].dt == 0)
+            do
                 this._process_event(this.seq.tracks[i].events[this.event_pos[i]++]);
+            while (this.event_pos[i] < this.seq.tracks[i].events.length && this.seq.tracks[i].events[this.event_pos[i]].dt == 0);
             if (this.event_pos[i] >= this.seq.tracks[i].events.length) {
                 tl--;
                 this.event_tl[i] = Infinity;
