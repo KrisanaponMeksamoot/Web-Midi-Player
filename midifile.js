@@ -19,7 +19,7 @@ class Midifile {
             if (view.getUint32(0) != 0x4D54726B)
                 throw new MidiMulformError("Invalid MTrk");
             let len = view.getUint32(4);
-            console.log(`track ${i} ${ofs} ${len}`);
+            // console.log(`track ${i} ${ofs} ${len}`);
             seq.tracks[i] = this._parseMTrk(new DataView(buffer, ofs+8, len));
             ofs += 8+len;
         }
@@ -180,8 +180,11 @@ class MidiMulformError extends Error {
 }
 
 class SoundBank {
-    constructor() {
-
+    constructor(buffers = Array(127)) {
+        this.buffers = buffers;
+    }
+    getBuffer(num) {
+        return this.buffers[num];
     }
 }
 
@@ -190,13 +193,15 @@ class SimpleMidiSequencer {
      * @param {MidiSequence} sequence
      * @param {SoundBank} soundbank
      */
-    constructor(sequence, soundbank) {
+    constructor(sequence, soundbank, actx = new AudioContext()) {
+        this.class = SimpleMidiSequencer;
         this.seq = sequence;
         this.loop_timeout = -1;
         this.event_pos = Array(this.seq.tracks.length).fill(0);
         this.event_tl = Array(this.seq.tracks.length).fill(0);
         this.sb = soundbank;
-        this.channels = Array(16).fill(null).map(_=>Array(127).fill(null));
+        this.actx = actx;
+        this.channels = Array(16).fill(null).map(_=>new this.class.AudioChannel(this.actx, soundbank.getBuffer(0)));
         this.currentInterval = 0;
         this.playing = false;
     }
@@ -253,6 +258,9 @@ class SimpleMidiSequencer {
                 case 0xA0:
                     this._play_sound(e.status & 0x0F, e.data, e.data2);
                     break;
+                case 0xB0:
+                    this._change_control(e.status & 0x0F, e.data, e.data2);
+                    break;
                 case 0xC0:
                     this._change_patch(e.status & 0x0F, e.data);
                     break;
@@ -265,36 +273,30 @@ class SimpleMidiSequencer {
                     this._play_sound(e.status & 0x0F, mx, e.data);
                     break;
                 default:
-                    console.warn(`Unimplemented: 0x${e.status.toString(16)}`);
+                    console.warn(`Unimplemented midi-event: 0x${e.status.toString(16)}`);
             }
         }
     }
     _change_patch(chan, patch) {
-        
+        this.channels[chan].buffer = this.sb.getBuffer(patch);
+    }
+    _change_control(chan, control, value) {
+        switch (control) {
+            case 0x27:
+                this.channels[chan].gnode.gain.value = value/127;
+                break;
+            case 0x40:
+                this.channels[chan].damper = value > 64;
+                break;
+            default:
+                console.warn(`Unimplemented control change: 0x${control.toString(16)}`);
+        }
     }
     _play_sound(chan, key, vel) {
-        let a = this.channels[chan][key];
-        if (a == null) {
-            a = new Audio(`./samples/0.wav`);
-            a.playbackRate = Math.min(Math.max(Math.pow(2, (key-72)/12), 0.25), 4.0);
-            a.preservesPitch = false;
-            this.channels[chan][key] = a;
-        }
-        // console.log("play", chan, key, vel);
-        a.volume = vel / 127;
-        a.currentTime = 0;
-        a.play();
+        this.channels[chan].getNode(key).play(vel/127);
     }
     _stop_sound(chan, key, vel) {
-        let a = this.channels[chan][key];
-        if (a == null) {
-            a = new Audio(`./samples/0.wav`);
-            a.playbackRate = Math.min(Math.max(Math.pow(2, (key-72)/12), 0.25), 4.0);
-            a.preservesPitch = false;
-            this.channels[chan][key] = a;
-        }
-        a.volume = 0;
-        a.pause();
+        this.channels[chan].getNode(key).stop();
     }
     start() {
         this.event_pos.fill(0);
@@ -311,4 +313,79 @@ class SimpleMidiSequencer {
         this.loop_timeout = -1;
         this.playing = false;
     }
+    static AudioChannel = class AudioChannel {
+        /**
+         * @param {BaseAudioContext} actx 
+         * @param {AudioBuffer} buffer 
+         */
+        constructor(actx, buffer) {
+            this.class = AudioChannel;
+            this.actx = actx;
+            this.buffer = buffer;
+            this.nodes = Array(127).fill(null);
+            this.gnode = this.actx.createGain();
+            this.gnode.connect(this.actx.destination);
+
+            this._damper = false;
+        }
+        getNode(note) {
+            if (this.nodes[note] == null)
+                this.nodes[note] = new this.class.AudioNode(this, Math.min(Math.max(Math.pow(2, (note-this.buffer.basePitch)/12), 0.0625), 128));
+            return this.nodes[note];
+        }
+        static AudioNode = class AudioNode {
+            /**
+             * @param {AudioChannel} channel 
+             * @param {number} pbrate 
+             */
+            constructor(channel, pbrate = 1) {
+                this.channel = channel;
+                this.pbrate = pbrate;
+                this.gnode = this.channel.actx.createGain();
+                this.gnode.connect(this.channel.gnode);
+                this.bs = null;
+
+                this.playing = false;
+            }
+            play(vol = 1) {
+                this.playing = true;
+                if (this.bs != null)
+                    this.bs.stop();
+                this.bs = this.channel.actx.createBufferSource();
+                this.bs.connect(this.gnode);
+                this.gnode.gain.value = vol;
+                this.bs.playbackRate.value = this.pbrate;
+                this.bs.buffer = this.channel.buffer;
+                this.bs.start();
+            }
+            stop() {
+                this.playing = false;
+                if (!this.channel._damper)
+                    this.bs.stop();
+            }
+        };
+        set damper(press) {
+            this._damper = press;
+            if (!this._damper)
+                this.nodes.forEach(an=>{
+                    if (an == null) return;
+                    if (!an.playing)
+                        an.stop();
+                });
+        }
+
+        get damper() {
+            return this._damper;
+        }
+
+        reset() {
+            this.nodes.forEach(an=>{
+                if (an == null) return;
+                an.gnode.gain.value = 1;
+            });
+            this.gnode.gain.value = 1;
+
+            this.damper = false;
+        }
+    };
 }

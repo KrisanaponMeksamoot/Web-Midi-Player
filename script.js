@@ -1,13 +1,32 @@
 var seq = null;
 // var sf = null;
 var sms = null;
+var actx = new AudioContext({sampleRate: 44100});
+var sb;
+
+(async ()=>{
+    let a_status = document.getElementById("status");
+    a_status.innerText = "Loading...";
+    let pitches = await (await fetch("./samples/pitches.json")).json();
+    let bufs = [];
+    for (let i=0;i<128;i++) {
+        a_status.innerText = `Loading (${i}/127)...`;
+        let buf = await actx.decodeAudioData(await (await fetch(`./samples/${i}.wav`)).arrayBuffer());
+        buf.basePitch = pitches[i];
+        bufs.push(buf);
+    }
+    sb = new SoundBank(bufs);
+    a_status.innerText ="";
+})();
 
 document.getElementById("filein").addEventListener("change", async e => {
     let file = e.target.files.item(0);
     let buf = await file.arrayBuffer();
+    a_status.innerText = "Parsing file...";
     seq = Midifile.parse(buf);
     console.log(seq);
-    sms = new SimpleMidiSequencer(seq, new SoundBank());
+    sms = new SimpleMidiSequencer(seq, sb, actx);
+    a_status.innerText ="";
 });
 
 // document.getElementById("soundfont").addEventListener("change", async e => {
