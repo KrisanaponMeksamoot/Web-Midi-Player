@@ -245,7 +245,6 @@ class SimpleMidiSequencer {
                     break;
             }
         } else if (e instanceof MidiEvent) {
-            e.status |= 0x80;
             switch (e.status & 0xF0) {
                 case 0x80:
                     this._stop_sound(e.status & 0x0F, e.data, e.data2);
