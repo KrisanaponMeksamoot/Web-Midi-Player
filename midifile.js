@@ -291,7 +291,7 @@ class SimpleMidiSequencer extends EventTarget {
                 this.channels[chan].gnode.gain.value = value/127;
                 break;
             case 0x40:
-                this.channels[chan].damper = value > 64;
+                this.channels[chan].damper = value > 63;
                 break;
             case 0x79:
                 this.channels.forEach(ch=>ch.reset());
