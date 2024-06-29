@@ -201,7 +201,9 @@ class SimpleMidiSequencer {
         this.event_tl = Array(this.seq.tracks.length).fill(0);
         this.sb = soundbank;
         this.actx = actx;
-        this.channels = Array(16).fill(null).map(_=>new this.class.AudioChannel(this.actx, soundbank.getBuffer(0)));
+        this.gnode = this.actx.createGain();
+        this.gnode.connect(this.actx.destination);
+        this.channels = Array(16).fill(null).map(_=>new this.class.AudioChannel(this.actx, soundbank.getBuffer(0), this.gnode));
         this.currentInterval = 0;
         this.playing = false;
     }
@@ -318,13 +320,13 @@ class SimpleMidiSequencer {
          * @param {BaseAudioContext} actx 
          * @param {AudioBuffer} buffer 
          */
-        constructor(actx, buffer) {
+        constructor(actx, buffer, destination = actx.destination) {
             this.class = AudioChannel;
             this.actx = actx;
             this.buffer = buffer;
             this.nodes = Array(127).fill(null);
             this.gnode = this.actx.createGain();
-            this.gnode.connect(this.actx.destination);
+            this.gnode.connect(destination);
 
             this._damper = false;
         }

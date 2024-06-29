@@ -27,6 +27,7 @@ document.getElementById("filein").addEventListener("change", async e => {
     seq = Midifile.parse(buf);
     console.log(seq);
     sms = new SimpleMidiSequencer(seq, sb, actx);
+    sms.gnode.gain.value = document.getElementById("volume").valueAsNumber/100;
     a_status.innerText ="";
 });
 
@@ -40,4 +41,9 @@ document.getElementById("filein").addEventListener("change", async e => {
 document.getElementById("cont").addEventListener("click", e => {
     sms.isPlaying() ? sms.stop() : sms.start();
     e.target.innerText = sms.isPlaying() ? "Stop" : "Play";
+});
+
+document.getElementById("volume").addEventListener("input", e => {
+    if (sms != null)
+        sms.gnode.gain.value = e.target.valueAsNumber/100;
 });
