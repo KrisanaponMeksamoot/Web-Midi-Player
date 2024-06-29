@@ -188,12 +188,13 @@ class SoundBank {
     }
 }
 
-class SimpleMidiSequencer {
+class SimpleMidiSequencer extends EventTarget {
     /**
      * @param {MidiSequence} sequence
      * @param {SoundBank} soundbank
      */
     constructor(sequence, soundbank, actx = new AudioContext()) {
+        super();
         this.class = SimpleMidiSequencer;
         this.seq = sequence;
         this.loop_timeout = -1;
@@ -238,6 +239,7 @@ class SimpleMidiSequencer {
             this0.loop_timeout = setTimeout(this0._tick, this0.currentInterval * ndt, this0);
         } else {
             this0.stop();
+            this0.dispatchEvent(new Event("ended"));
         }
     }
     /**

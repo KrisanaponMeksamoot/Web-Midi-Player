@@ -28,6 +28,7 @@ document.getElementById("filein").addEventListener("change", async e => {
     console.log(seq);
     sms = new SimpleMidiSequencer(seq, sb, actx);
     sms.gnode.gain.value = document.getElementById("volume").valueAsNumber/100;
+    sms.addEventListener("ended", ()=>document.getElementById("cont").innerText = "Play")
     a_status.innerText ="";
 });
 
