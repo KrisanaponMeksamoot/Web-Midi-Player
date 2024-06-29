@@ -221,13 +221,13 @@ class SimpleMidiSequencer {
                 continue;
             }
             this0.event_tl[i] = this0.seq.tracks[i].events[this0.event_pos[i]].dt;
-            console.log(i, this0.event_pos[i]);
+            // console.log(i, this0.event_pos[i]);
         }
         if (tl > 0) {
             let ndt = Math.min(...this0.event_tl);
             for (let i in this0.event_tl)
                 this0.event_tl[i] -= ndt;
-            console.log("delay", this0.currentInterval, ndt, this0.currentInterval*ndt);
+            // console.log("delay", this0.currentInterval, ndt, this0.currentInterval*ndt);
             this0.loop_timeout = setTimeout(this0._tick, this0.currentInterval * ndt, this0);
         } else {
             this0.stop();
@@ -280,7 +280,7 @@ class SimpleMidiSequencer {
             a.preservesPitch = false;
             this.channels[chan][key] = a;
         }
-        console.log("play", chan, key, vel);
+        // console.log("play", chan, key, vel);
         a.volume = vel / 127;
         a.currentTime = 0;
         a.play();
