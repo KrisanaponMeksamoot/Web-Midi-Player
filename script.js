@@ -40,7 +40,12 @@ document.getElementById("filein").addEventListener("change", async e => {
 // });
 
 document.getElementById("cont").addEventListener("click", e => {
-    sms.isPlaying() ? sms.stop() : sms.start();
+    if (sms.isPlaying()) {
+        sms.reset();
+        sms.stop();
+    } else {
+        sms.start();
+    }
     e.target.innerText = sms.isPlaying() ? "Stop" : "Play";
 });
 
