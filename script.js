@@ -1,3 +1,5 @@
+var a_status = document.getElementById("status");
+
 var seq = null;
 // var sf = null;
 var sms = null;
@@ -5,7 +7,6 @@ var actx = new AudioContext({sampleRate: 44100});
 var sb;
 
 (async ()=>{
-    let a_status = document.getElementById("status");
     a_status.innerText = "Loading...";
     let pitches = await (await fetch("./samples/pitches.json")).json();
     let bufs = [];
