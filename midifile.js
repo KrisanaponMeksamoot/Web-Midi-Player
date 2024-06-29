@@ -208,38 +208,39 @@ class SimpleMidiSequencer extends EventTarget {
         this.currentInterval = 0;
         this.playing = false;
     }
-    _tick(this0 = this) {
-        if (!this0.playing)
-            return;
-        let tl = this0.seq.tracks.length;
-        for (let i=0;i<this0.seq.tracks.length;i++) {
-            if (this0.event_pos[i] >= this0.seq.tracks[i].events.length) {
+    _tick() {
+        let tl = this.seq.tracks.length;
+        for (let i=0;i<this.seq.tracks.length;i++) {
+            if (this.event_pos[i] >= this.seq.tracks[i].events.length) {
                 tl--;
-                this0.event_tl[i] = Infinity;
+                this.event_tl[i] = Infinity;
                 continue;
             }
-            if (this0.event_tl[i] > 0)
+            if (this.event_tl[i] > 0)
                 continue;
-            this0._process_event(this0.seq.tracks[i].events[this0.event_pos[i]++]);
-            while (this0.event_pos[i] < this0.seq.tracks[i].events.length && this0.seq.tracks[i].events[this0.event_pos[i]].dt == 0)
-                this0._process_event(this0.seq.tracks[i].events[this0.event_pos[i]++]);
-            if (this0.event_pos[i] >= this0.seq.tracks[i].events.length) {
+            this._process_event(this.seq.tracks[i].events[this.event_pos[i]++]);
+            while (this.event_pos[i] < this.seq.tracks[i].events.length && this.seq.tracks[i].events[this.event_pos[i]].dt == 0)
+                this._process_event(this.seq.tracks[i].events[this.event_pos[i]++]);
+            if (this.event_pos[i] >= this.seq.tracks[i].events.length) {
                 tl--;
-                this0.event_tl[i] = Infinity;
+                this.event_tl[i] = Infinity;
                 continue;
             }
-            this0.event_tl[i] = this0.seq.tracks[i].events[this0.event_pos[i]].dt;
-            // console.log(i, this0.event_pos[i]);
+            this.event_tl[i] = this.seq.tracks[i].events[this.event_pos[i]].dt;
+            // console.log(i, this.event_pos[i]);
         }
-        if (tl > 0) {
-            let ndt = Math.min(...this0.event_tl);
-            for (let i in this0.event_tl)
-                this0.event_tl[i] -= ndt;
-            // console.log("delay", this0.currentInterval, ndt, this0.currentInterval*ndt);
-            this0.loop_timeout = setTimeout(this0._tick, this0.currentInterval * ndt, this0);
-        } else {
-            this0.stop();
-            this0.dispatchEvent(new Event("ended"));
+        return tl > 0;
+    }
+    async _run() {
+        while (this.playing && this._tick()) {
+            let ndt = Math.min(...this.event_tl);
+            for (let i in this.event_tl)
+                this.event_tl[i] -= ndt;
+            this.loop_timeout = await new Promise((res)=>setTimeout(res, this.currentInterval * ndt));
+        }
+        if (this.playing) {
+            this.stop();
+            this.dispatchEvent(new Event("ended"));
         }
     }
     /**
@@ -310,14 +311,17 @@ class SimpleMidiSequencer extends EventTarget {
         this.channels[chan].getNode(key).stop();
     }
     start() {
+        this.reset();
+        this.playing = true;
+        this._run();
+    }
+    reset() {
         this.event_pos.fill(0);
         this.event_tl.fill(0);
         this.currentInterval = 60000/this.seq.division/120;
-        this.playing = true;
-        this.loop_timeout = setTimeout(this._tick, this.currentInterval, this);
     }
     isPlaying() {
-        return this.loop_timeout != -1;
+        return this.playing;
     }
     stop() {
         clearTimeout(this.loop_timeout);
