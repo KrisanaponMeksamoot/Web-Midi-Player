@@ -286,11 +286,18 @@ class SimpleMidiSequencer extends EventTarget {
     }
     _change_control(chan, control, value) {
         switch (control) {
+            case 0x7:
             case 0x27:
                 this.channels[chan].gnode.gain.value = value/127;
                 break;
             case 0x40:
                 this.channels[chan].damper = value > 64;
+                break;
+            case 0x79:
+                this.channels.forEach(ch=>ch.reset());
+                break;
+            case 0x7B:
+                this.channels.forEach(ch=>ch.stopAll());
                 break;
             default:
                 console.warn(`Unimplemented control change: 0x${control.toString(16)}`);
@@ -363,6 +370,7 @@ class SimpleMidiSequencer extends EventTarget {
                 this.bs.start();
             }
             stop() {
+                if (!this.playing) return;
                 this.playing = false;
                 if (!this.channel._damper)
                     this.bs.stop();
@@ -390,6 +398,10 @@ class SimpleMidiSequencer extends EventTarget {
             this.gnode.gain.value = 1;
 
             this.damper = false;
+        }
+
+        stopAll() {
+            this.nodes.forEach(an=>an.stop());
         }
     };
 }
