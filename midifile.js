@@ -232,11 +232,16 @@ class SimpleMidiSequencer extends EventTarget {
         return tl > 0;
     }
     async _run() {
+        let st = Date.now();
         while (this.playing && this._tick()) {
             let ndt = Math.min(...this.event_tl);
             for (let i in this.event_tl)
                 this.event_tl[i] -= ndt;
-            this.loop_timeout = await new Promise((res)=>setTimeout(res, this.currentInterval * ndt));
+            let ct = Date.now();
+            let dt = this.currentInterval * ndt - (ct - st);
+            if (dt > 0)
+                this.loop_timeout = await new Promise((res)=>setTimeout(res, dt));
+            st = ct;
         }
         if (this.playing) {
             this.stop();
