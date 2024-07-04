@@ -256,7 +256,6 @@ class SimpleMidiSequencer extends EventTarget {
         if (e instanceof MetaEvent) {
             switch (e.type) {
                 case 0x51:
-                    console.log(e.data);
                     this.currentInterval = (e.data[0]<<16 | e.data[1]<<8 | e.data[2])/1000/this.seq.division;
                     break;
             }
