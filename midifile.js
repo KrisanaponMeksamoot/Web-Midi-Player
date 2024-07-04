@@ -238,7 +238,7 @@ class SimpleMidiSequencer extends EventTarget {
             for (let i in this.event_tl)
                 this.event_tl[i] -= ndt;
             let ct = Date.now();
-            let dt = this.currentInterval * ndt - (ct - st);
+            let dt = this.currentInterval * ndt;// - (ct - st);
             if (dt > 0)
                 this.loop_timeout = await new Promise((res)=>setTimeout(res, dt));
             st = ct;
