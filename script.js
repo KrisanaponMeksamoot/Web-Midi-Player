@@ -7,6 +7,16 @@ var actx = new AudioContext({sampleRate: 44100});
 var sb;
 
 (async ()=>{
+    if ("serviceWorker" in navigator) {
+        try {
+            await navigator.serviceWorker.register("/service_worker.js", {
+                scope: location.pathname,
+            });
+        } catch (error) {
+            console.error(`Registration failed with ${error}`);
+        }
+    }
+
     a_status.innerText = "Loading...";
     let pitches = await (await fetch("./samples/pitches.json")).json();
     let bufs = [];
