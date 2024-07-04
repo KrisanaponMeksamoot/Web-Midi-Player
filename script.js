@@ -31,15 +31,20 @@ var sb;
 })();
 
 document.getElementById("filein").addEventListener("change", async e => {
-    let file = e.target.files.item(0);
-    let buf = await file.arrayBuffer();
-    a_status.innerText = "Parsing file...";
-    seq = Midifile.parse(buf);
-    console.log(seq);
-    sms = new SimpleMidiSequencer(seq, sb, actx);
-    sms.gnode.gain.value = document.getElementById("volume").valueAsNumber/100;
-    sms.addEventListener("ended", ()=>document.getElementById("cont").innerText = "Play")
-    a_status.innerText ="";
+    try {
+        let file = e.target.files.item(0);
+        a_status.innerText = "Loading file...";
+        let buf = await file.arrayBuffer();
+        a_status.innerText = "Parsing file...";
+        seq = Midifile.parse(buf);
+        console.log(seq);
+        sms = new SimpleMidiSequencer(seq, sb, actx);
+        sms.gnode.gain.value = document.getElementById("volume").valueAsNumber/100;
+        sms.addEventListener("ended", ()=>document.getElementById("cont").innerText = "Play")
+        a_status.innerText = "";
+    } catch (err) {
+        a_status.innerText = err;
+    }
 });
 
 // document.getElementById("soundfont").addEventListener("change", async e => {
