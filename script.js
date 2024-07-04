@@ -9,7 +9,7 @@ var sb;
 (async ()=>{
     if ("serviceWorker" in navigator) {
         try {
-            await navigator.serviceWorker.register("/service_worker.js", {
+            await navigator.serviceWorker.register("service_worker.js", {
                 scope: location.pathname,
             });
         } catch (error) {
