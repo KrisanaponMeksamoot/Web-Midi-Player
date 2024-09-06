@@ -19,13 +19,20 @@ var sb;
 
     a_status.innerText = "Loading...";
     let pitches = await (await fetch("./samples/pitches.json")).json();
-    let bufs = [];
+    let bufs = Array(128);
+    let i_com = 0;
+    a_status.innerText = `Loading (0/127)...`;
+    let arr = [];
     for (let i=0;i<128;i++) {
-        a_status.innerText = `Loading (${i}/127)...`;
-        let buf = await actx.decodeAudioData(await (await fetch(`./samples/${i}.wav`)).arrayBuffer());
-        buf.basePitch = pitches[i];
-        bufs.push(buf);
+        arr.push((async ()=>{
+            let buf = await actx.decodeAudioData(await (await fetch(`./samples/${i}.wav`)).arrayBuffer());
+            buf.basePitch = pitches[i];
+            bufs[i] = buf;
+            i_com++;
+            a_status.innerText = `Loading (${i_com}/127)...`;
+        })());
     }
+    await Promise.all(arr);
     sb = new SoundBank(bufs);
     a_status.innerText ="";
 })();
