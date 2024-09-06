@@ -6,6 +6,15 @@ var sms = null;
 var actx = new AudioContext({sampleRate: 44100});
 var sb;
 
+/**
+ * @type {HTMLCanvasElement}
+ */
+var canvas = document.getElementById("fallingnotes");
+var canvas_ctx = canvas.getContext("2d");
+var fallingNotes = new FallingNotes(new Piano());
+canvas.width = fallingNotes.width;
+canvas.height = fallingNotes.height + fallingNotes.piano.height;
+
 (async ()=>{
     if ("serviceWorker" in navigator) {
         try {
@@ -57,13 +66,27 @@ document.getElementById("filein").addEventListener("change", async e => {
         sms.addEventListener("tickupdate", update_status);
         sms.addEventListener("bpmchange", update_status);
         update_status();
+        fallingNotes.piano.player = sms;
+        fallingNotes.piano.noteMap = new NoteMap(seq);
     } catch (err) {
+        console.error(err);
         a_status.innerText = err;
     }
 });
 function update_status() {
     a_status.innerText = `bpm: ${sms.status.bpm.toFixed(2)} tickpos: ${sms.status.tick_pos}/${sms.seq.length}`;
 }
+function render() {
+    canvas_ctx.clearRect(0, 0, canvas.width, canvas.height);
+    fallingNotes.paint(canvas_ctx);
+    fallingNotes.piano.paint(canvas_ctx);
+    if (sms != null && sms.playing) {
+        canvas_ctx.fillStyle = "white";
+        canvas_ctx.fillText(sms.getTick(), 0, 15);
+        requestAnimationFrame(render);
+    }
+}
+render();
 
 // document.getElementById("soundfont").addEventListener("change", async e => {
 //     let file = e.target.files.item(0);
@@ -78,6 +101,7 @@ document.getElementById("cont").addEventListener("click", e => {
         sms.stop();
     } else {
         sms.start();
+        render();
     }
     e.target.innerText = sms.isPlaying() ? "Stop" : "Play";
 });

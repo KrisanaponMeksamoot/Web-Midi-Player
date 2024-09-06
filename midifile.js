@@ -241,23 +241,28 @@ class SimpleMidiSequencer extends EventTarget {
         return tl > 0;
     }
     async _run() {
-        let st = Date.now();
+        this._st = Date.now();
         while (this.playing && this._tick()) {
-            let ndt = Math.min(...this.event_tl);
+            this._ndt = Math.min(...this.event_tl);
             for (let i in this.event_tl)
-                this.event_tl[i] -= ndt;
-            let ct = Date.now();
-            let dt = this.currentInterval * ndt / this.speed;// - (ct - st);
-            this.status.tick_pos += ndt;
+                this.event_tl[i] -= this._ndt;
+            this.status.tick_pos += this._ndt;
             this.dispatchEvent(new Event("tickupdate"));
+            let ct = Date.now();
+            let dt = this.currentInterval * this._ndt / this.speed;// - (ct - this._st);
+            this._st = ct;
             if (dt > 0)
                 this.loop_timeout = await new Promise((res)=>setTimeout(res, dt));
-            st = ct;
         }
         if (this.playing) {
             this.stop();
             this.dispatchEvent(new Event("ended"));
         }
+    }
+    getTick() {
+        if (!this.playing)
+            return this.status.tick_pos;
+        return this.status.tick_pos + parseInt((Date.now() - this._st) * this.speed / this.currentInterval) - this._ndt;
     }
     /**
      * 
@@ -338,6 +343,8 @@ class SimpleMidiSequencer extends EventTarget {
         this.event_pos.fill(0);
         this.event_tl.fill(0);
         this.currentInterval = 60000/this.seq.division/120;
+        this.status.bpm = 0;
+        this.status.tick_pos = 0;
     }
     isPlaying() {
         return this.playing;

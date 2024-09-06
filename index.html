@@ -6,7 +6,15 @@
     <meta name="description" content="Midi player written in javascript">
     <meta name="author" content="Krisanapon Meksamoot">
     <title>Midi Player</title>
+    <script src="algorithm.js"></script>
     <script src="midifile.js"></script>
+    <script src="fallingnotes.js"></script>
+    <style>
+        canvas {
+            background-color: black;
+            border: 1px black solid;
+        }
+    </style>
 </head>
 <body>
     Midi file: <input type="file" id="filein" accept=".mid,.midi,audio/midi,audio/x-midi">
@@ -14,7 +22,8 @@
     <button id="cont">Play</button>
     Volume: <input type="range" min="0" max="2" id="volume" value="1" step="0.05"><a id="volume">100%</a>
     Speed: <input type="range" min="0.05" max="3" id="speed" value="1" step="0.05"><a id="speed">100%</a>
-    <a id="status"></a>
+    <a id="status"></a><br>
+    <canvas id="fallingnotes"></canvas>
 
     <script src="script.js"></script>
 </body>
