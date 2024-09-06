@@ -54,11 +54,16 @@ document.getElementById("filein").addEventListener("change", async e => {
         sms.gnode.gain.value = document.querySelector("input#volume").valueAsNumber;
         sms.speed = document.querySelector("input#speed").valueAsNumber;
         sms.addEventListener("ended", ()=>document.getElementById("cont").innerText = "Play")
-        a_status.innerText = "";
+        sms.addEventListener("tickupdate", update_status);
+        sms.addEventListener("bpmchange", update_status);
+        update_status();
     } catch (err) {
         a_status.innerText = err;
     }
 });
+function update_status() {
+    a_status.innerText = `bpm: ${sms.status.bpm.toFixed(2)} tickpos: ${sms.status.tick_pos}/${sms.seq.length}`;
+}
 
 // document.getElementById("soundfont").addEventListener("change", async e => {
 //     let file = e.target.files.item(0);

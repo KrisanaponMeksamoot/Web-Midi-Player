@@ -21,6 +21,7 @@ class Midifile {
             let len = view.getUint32(4);
             // console.log(`track ${i} ${ofs} ${len}`);
             seq.tracks[i] = this._parseMTrk(new DataView(buffer, ofs+8, len));
+            seq.length = Math.max(seq.length, seq.tracks[i].length);
             ofs += 8+len;
         }
         if (ofs < buffer.byteLength)
@@ -43,6 +44,7 @@ class Midifile {
                 dt <<= 7;
                 dt |= rb & 0x7f;
             } while ((rb & 0x80) > 0);
+            track.length += dt;
 
             let type = view.getUint8(ofs++);
             if (type == 0xF0 || type == 0xF7) {
@@ -110,6 +112,7 @@ class MidiSequence {
         this.tracks = tracks;
         this.format = -1;
         this.division = -1;
+        this.length = 0;
     }
 }
 
@@ -120,6 +123,7 @@ class MidiTrack {
      */
     constructor(events = []) {
         this.events = events;
+        this.length = 0;
     }
 }
 
@@ -207,6 +211,10 @@ class SimpleMidiSequencer extends EventTarget {
         this.gnode.connect(this.actx.destination);
         this.channels = Array(16).fill(null).map(_=>new this.class.AudioChannel(this.actx, soundbank.getBuffer(0), this.gnode));
         this.currentInterval = 0;
+        this.status = {
+            tick_pos: 0,
+            bpm: 0
+        };
         this.playing = false;
     }
     _tick() {
@@ -240,6 +248,8 @@ class SimpleMidiSequencer extends EventTarget {
                 this.event_tl[i] -= ndt;
             let ct = Date.now();
             let dt = this.currentInterval * ndt / this.speed;// - (ct - st);
+            this.status.tick_pos += ndt;
+            this.dispatchEvent(new Event("tickupdate"));
             if (dt > 0)
                 this.loop_timeout = await new Promise((res)=>setTimeout(res, dt));
             st = ct;
@@ -257,7 +267,10 @@ class SimpleMidiSequencer extends EventTarget {
         if (e instanceof MetaEvent) {
             switch (e.type) {
                 case 0x51:
-                    this.currentInterval = (e.data[0]<<16 | e.data[1]<<8 | e.data[2])/1000/this.seq.division;
+                    let len = (e.data[0]<<16 | e.data[1]<<8 | e.data[2]);
+                    this.currentInterval = len/1000/this.seq.division;
+                    this.status.bpm = 60000000/len;
+                    this.dispatchEvent(new Event("bpmchange"));
                     break;
             }
         } else if (e instanceof MidiEvent) {
