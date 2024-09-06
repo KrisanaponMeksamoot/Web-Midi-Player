@@ -202,6 +202,7 @@ class SimpleMidiSequencer extends EventTarget {
         this.event_tl = Array(this.seq.tracks.length).fill(0);
         this.sb = soundbank;
         this.actx = actx;
+        this.speed = 1;
         this.gnode = this.actx.createGain();
         this.gnode.connect(this.actx.destination);
         this.channels = Array(16).fill(null).map(_=>new this.class.AudioChannel(this.actx, soundbank.getBuffer(0), this.gnode));
@@ -238,7 +239,7 @@ class SimpleMidiSequencer extends EventTarget {
             for (let i in this.event_tl)
                 this.event_tl[i] -= ndt;
             let ct = Date.now();
-            let dt = this.currentInterval * ndt;// - (ct - st);
+            let dt = this.currentInterval * ndt / this.speed;// - (ct - st);
             if (dt > 0)
                 this.loop_timeout = await new Promise((res)=>setTimeout(res, dt));
             st = ct;

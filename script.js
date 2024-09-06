@@ -45,8 +45,14 @@ document.getElementById("filein").addEventListener("change", async e => {
         a_status.innerText = "Parsing file...";
         seq = Midifile.parse(buf);
         console.log(seq);
+        if (sms != null && sms.isPlaying()) {
+            sms.reset();
+            sms.stop();
+            document.getElementById("cont").innerText = "Play";
+        }
         sms = new SimpleMidiSequencer(seq, sb, actx);
-        sms.gnode.gain.value = document.getElementById("volume").valueAsNumber/100;
+        sms.gnode.gain.value = document.querySelector("input#volume").valueAsNumber;
+        sms.speed = document.querySelector("input#speed").valueAsNumber;
         sms.addEventListener("ended", ()=>document.getElementById("cont").innerText = "Play")
         a_status.innerText = "";
     } catch (err) {
@@ -71,7 +77,16 @@ document.getElementById("cont").addEventListener("click", e => {
     e.target.innerText = sms.isPlaying() ? "Stop" : "Play";
 });
 
-document.getElementById("volume").addEventListener("input", e => {
+document.querySelector("input#volume").addEventListener("input", e => {
+    let val = e.target.valueAsNumber;
     if (sms != null)
-        sms.gnode.gain.value = e.target.valueAsNumber/100;
+        sms.gnode.gain.value = val;
+    document.querySelector("a#volume").innerText = `${parseInt(val*100)}%`
+});
+
+document.querySelector("input#speed").addEventListener("input", e => {
+    let val = e.target.valueAsNumber;
+    if (sms != null)
+        sms.speed = val;
+    document.querySelector("a#speed").innerText = `${parseInt(val*100)}%`
 });
