@@ -71,6 +71,7 @@ document.getElementById("filein").addEventListener("change", async e => {
         update_status();
         fallingNotes.piano.player = sms;
         fallingNotes.piano.noteMap = new NoteMap(seq);
+        render();
     } catch (err) {
         console.error(err);
         a_status.innerText = err;

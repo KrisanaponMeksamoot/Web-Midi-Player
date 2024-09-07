@@ -78,7 +78,7 @@ class NoteMap {
     }
 
     noteBefore(end) {
-        return this.notes.slice(0, binarySearchFloor(this.notes, new Note(-1, end+1, -1), Note.compareByChannel));
+        return this.notes.slice(0, binarySearchFloor(this.notes, new Note(255, end, 255), Note.compareByChannel));
     }
 
     static NoteEvent = class NoteEvent {
