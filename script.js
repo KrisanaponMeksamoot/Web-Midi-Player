@@ -84,10 +84,13 @@ function render() {
     canvas_ctx.clearRect(0, 0, canvas.width, canvas.height);
     fallingNotes.paint(canvas_ctx);
     fallingNotes.piano.paint(canvas_ctx);
-    if (sms != null && sms.playing) {
+    if (sms) {
+        canvas_ctx.fillStyle = "lightgray";
+        canvas_ctx.fillRect(0, 0, sms.currentTick*canvas.width/sms.seq.length, 5);
         canvas_ctx.fillStyle = "white";
-        canvas_ctx.fillText(sms.currentTick, 0, 15);
-        requestAnimationFrame(render);
+        canvas_ctx.fillText(sms.currentTick, 2, 18);
+        if (sms.playing)
+            requestAnimationFrame(render);
     }
 }
 render();
