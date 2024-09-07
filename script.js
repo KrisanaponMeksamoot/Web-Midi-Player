@@ -2,6 +2,9 @@ var a_status = document.getElementById("status");
 
 var seq = null;
 // var sf = null;
+/**
+ * @type {SimpleMidiSequencer}
+ */
 var sms = null;
 var actx = new AudioContext({sampleRate: 44100});
 var sb;
@@ -74,7 +77,7 @@ document.getElementById("filein").addEventListener("change", async e => {
     }
 });
 function update_status() {
-    a_status.innerText = `bpm: ${sms.status.bpm.toFixed(2)} tickpos: ${sms.status.tick_pos}/${sms.seq.length}`;
+    a_status.innerText = `bpm: ${sms.status.bpm.toFixed(2)} tickpos: ${sms.currentTick}/${sms.seq.length}`;
 }
 function render() {
     canvas_ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -82,7 +85,7 @@ function render() {
     fallingNotes.piano.paint(canvas_ctx);
     if (sms != null && sms.playing) {
         canvas_ctx.fillStyle = "white";
-        canvas_ctx.fillText(sms.getTick(), 0, 15);
+        canvas_ctx.fillText(sms.currentTick, 0, 15);
         requestAnimationFrame(render);
     }
 }

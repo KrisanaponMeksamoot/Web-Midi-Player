@@ -1,4 +1,6 @@
 class NoteMap {
+    /**@type {Note[]} */
+    note;
     /**
      * 
      * @param {MidiSequence} seq 
@@ -12,6 +14,7 @@ class NoteMap {
             let clen = 0;
             for (let i in track.events) {
                 let msg = track.events[i];
+                clen += msg.dt;
                 if (!(msg instanceof MidiEvent))
                     continue;
                 switch (msg.status & 0xF0) {
@@ -19,7 +22,7 @@ class NoteMap {
                     case 0x90:
                     case 0xA0:
                         note_events
-                                .push(new NoteMap.NoteEvent(t, clen+=msg.dt, msg.status & 0x0F, msg.data, msg.data2,
+                                .push(new NoteMap.NoteEvent(t, clen, msg.status & 0x0F, msg.data, msg.data2,
                                         (msg.status & 0xF0) != 0x80));
                 }
             }
@@ -27,16 +30,16 @@ class NoteMap {
         }
         note_events = note_events.sort(NoteMap.NoteEvent_compare);
         // System.out.println(note_events);
-        let note_indexes = Array(127).fill(null);
+        let note_indexes = Array(127);
         let notes = [];
         for (let ne of note_events) {
             let recent_note = note_indexes[ne.note];
-            if (recent_note != null && recent_note.channel != ne.channel)
+            if (recent_note && recent_note.channel != ne.channel)
                 recent_note = null;
             if (ne.on) {
                 notes.push(note_indexes[ne.note] = ne.toNote(this.sequence.division));
             }
-            if (recent_note != null && recent_note.getEndTime() > ne.time) {
+            if (recent_note && recent_note.getEndTime() > ne.time) {
                 recent_note.duration = ne.time - recent_note.startTime;
             }
         }
@@ -52,8 +55,13 @@ class NoteMap {
         this.notes = notes.sort(Note.compareByChannel);
     }
 
+    /**
+     * 
+     * @param {number[]} notes 
+     * @param {number} time 
+     */
     notesAt(notes, time) {
-        let currentNotei = binarySearchFloor(notes, new Note(-1, time, -1), Note.compareByChannel);
+        let currentNotei = binarySearchCeil(this.notes, new Note(0, time, 0), Note.compareByChannel);
         let currentNote = this.notes[currentNotei];
         let ns = Array(127).fill(false);
         let count = 0;
@@ -70,10 +78,19 @@ class NoteMap {
     }
 
     noteBefore(end) {
-        return this.notes.slice(0, binarySearchFloor(this.notes, new Note(-1, end, -1), Note.compareByChannel));
+        return this.notes.slice(0, binarySearchFloor(this.notes, new Note(-1, end+1, -1), Note.compareByChannel));
     }
 
     static NoteEvent = class NoteEvent {
+        /**
+         * 
+         * @param {number} track 
+         * @param {number} start 
+         * @param {number} channel 
+         * @param {number} note 
+         * @param {number} velocity 
+         * @param {boolean} on 
+         */
         constructor(track, start, channel, note, velocity, on) {
             this.track = track;
             this.time = start;
@@ -108,6 +125,13 @@ class NoteMap {
 }
 
 class Note {
+    /**
+     * 
+     * @param {number} note 
+     * @param {number} startTime 
+     * @param {number} channel 
+     * @param {number} duration 
+     */
     constructor(note, startTime, channel, duration=-1) {
         this.note = note;
         this.startTime = startTime;
@@ -175,6 +199,10 @@ class Note {
 }
 
 class FallingNotes {
+    /**
+     * 
+     * @param {Piano} piano 
+     */
     constructor(piano) {
         this.piano = piano;
         this.scale = 10;
@@ -194,13 +222,13 @@ class FallingNotes {
 
         let colors = [ "#0f0", "blue", "#fa0", "#f00", "yellow", "pink", "#0ff" ];
 
-        let time = this.piano.player.getTick();
+        let time = this.piano.player.currentTick;
 
         let nw = [ true, false, true, false, true, true, false, true, false, true, false, true ];
         let nx = [ 0, 8, 10, 18, 20, 30, 38, 40, 48, 50, 58, 60 ];
 
         for (let note of this.piano.noteMap
-                .noteBefore(this.piano.player.getTick() + this.width * this.scale)) {
+                .noteBefore(time + this.width * this.scale)) {
             if (note.getEndTime() < time)
                 continue;
 
@@ -219,9 +247,11 @@ class FallingNotes {
 }
 
 class Piano {
+    /**@type {SimpleMidiSequencer} */
+    player = null;
+    /**@type {NoteMap} */
+    noteMap = null;
     constructor() {
-        this.player = null;
-        this.noteMap = null;
         let k = [ true, false, true, false, true, true, false, true, false, true, false, true ];
 
         this.keys = Array(127);
@@ -244,8 +274,8 @@ class Piano {
         g.fillStyle = "white";
         g.fillRect(0, this.y, this.width, this.height);
         this.reset();
-        if (this.player != null)
-            this.noteMap.notesAt(this.status, this.player.getTick());
+        if (this.player)
+            this.noteMap.notesAt(this.status, this.player.currentTick);
         g.strokeStyle = "black";
         let x = 0;
         for (let i in this.keys) {

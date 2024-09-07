@@ -210,9 +210,9 @@ class SimpleMidiSequencer extends EventTarget {
         this.gnode = this.actx.createGain();
         this.gnode.connect(this.actx.destination);
         this.channels = Array(16).fill(null).map(_=>new this.class.AudioChannel(this.actx, soundbank.getBuffer(0), this.gnode));
+        this._last_update_tick_pos = 0;
         this.currentInterval = 0;
         this.status = {
-            tick_pos: 0,
             bpm: 0
         };
         this.playing = false;
@@ -246,23 +246,23 @@ class SimpleMidiSequencer extends EventTarget {
             this._ndt = Math.min(...this.event_tl);
             for (let i in this.event_tl)
                 this.event_tl[i] -= this._ndt;
-            this.status.tick_pos += this._ndt;
             this.dispatchEvent(new Event("tickupdate"));
             let ct = Date.now();
             let dt = this.currentInterval * this._ndt / this.speed;// - (ct - this._st);
             this._st = ct;
             if (dt > 0)
                 this.loop_timeout = await new Promise((res)=>setTimeout(res, dt));
+            this._last_update_tick_pos += this._ndt;
         }
         if (this.playing) {
             this.stop();
             this.dispatchEvent(new Event("ended"));
         }
     }
-    getTick() {
+    get currentTick() {
         if (!this.playing)
-            return this.status.tick_pos;
-        return this.status.tick_pos + parseInt((Date.now() - this._st) * this.speed / this.currentInterval) - this._ndt;
+            return this._last_update_tick_pos;
+        return this._last_update_tick_pos + parseInt((Date.now() - this._st) * this.speed / this.currentInterval);
     }
     /**
      * 
@@ -344,7 +344,7 @@ class SimpleMidiSequencer extends EventTarget {
         this.event_tl.fill(0);
         this.currentInterval = 60000/this.seq.division/120;
         this.status.bpm = 0;
-        this.status.tick_pos = 0;
+        this._last_update_tick_pos = 0;
     }
     isPlaying() {
         return this.playing;
