@@ -67,7 +67,7 @@ class NoteMap {
         let count = 0;
         while (currentNote != null && count < this.notes_range_count) {
             if (currentNote.inside(time))
-                notes[currentNote.note] = 1;
+                notes[currentNote.note] = currentNote.channel;
             if (!ns[currentNote.note]) {
                 count++;
                 ns[currentNote.note] = true;
@@ -220,8 +220,6 @@ class FallingNotes {
         if (this.piano.player == null)
             return;
 
-        let colors = [ "#0f0", "blue", "#fa0", "#f00", "yellow", "pink", "#0ff" ];
-
         let time = this.piano.player.currentTick;
 
         let nw = [ true, false, true, false, true, true, false, true, false, true, false, true ];
@@ -236,17 +234,18 @@ class FallingNotes {
             let x = parseInt(n / 12) * 7 * 10 + nx[n % 12];
 
             let c = note.channel;
-            g.fillStyle = colors[((c & 0xf) + (c >> 4)) % colors.length];
+            g.fillStyle = this.piano.colors[((c & 0xf) + (c >> 4)) % this.piano.colors.length];
 
             let h = parseInt(note.duration / this.scale);
 
-            g.fillRect(x, this.height - (note.startTime - time) / this.scale - h, nw[n % 12] ? 10 : 5,
+            g.fillRect(x, this.height - (note.startTime - time) / this.scale - h, nw[n % 12] ? 9 : 4,
                     h);
         }
     }
 }
 
 class Piano {
+    colors = [ "#0f0", "royalblue", "orange", "orangered", "yellow", "pink", "cyan" ];
     /**@type {SimpleMidiSequencer} */
     player = null;
     /**@type {NoteMap} */
@@ -280,16 +279,22 @@ class Piano {
         let x = 0;
         for (let i in this.keys) {
             let key = this.keys[i];
-            if (key == Piano.Key.WhiteKey)
-                x += key.render(g, x, this.y, this.status[i]);
+            if (key == Piano.Key.WhiteKey) {
+                let c = this.status[i];
+                let color = (c==-1) ? undefined : this.colors[((c & 0xf) + (c >> 4)) % this.colors.length];
+                x += key.render(g, x, this.y, color);
+            }
         }
         x = 0;
         for (let i in this.keys) {
             let key = this.keys[i];
             if (key == Piano.Key.WhiteKey)
                 x += 10;
-            else
-                key.render(g, x, this.y, this.status[i]);
+            else {
+                let c = this.status[i];
+                let color = (c==-1) ? undefined : this.colors[((c & 0xf) + (c >> 4)) % this.colors.length];
+                key.render(g, x, this.y, color);
+            }
         }
     }
 
@@ -304,7 +309,7 @@ class Piano {
          * @param {number} status 
          * @returns 
          */
-        render(g, x, y, status) {
+        render(g, x, y, color=undefined) {
             if (this == Key.WhiteKey) {
                 g.beginPath();
                 g.moveTo(x, y);
@@ -314,8 +319,8 @@ class Piano {
                 g.closePath();
                 g.stroke();
 
-                if (status > 0) {
-                    g.fillStyle = "lime";
+                if (color) {
+                    g.fillStyle = color;
                     g.fillRect(x + 1, y + 1, 8, 48);
                 }
 
@@ -324,8 +329,8 @@ class Piano {
                 g.fillStyle = "black";
                 g.fillRect(x - 2, y, 5, 25);
 
-                if (status > 0) {
-                    g.fillStyle = "lime"
+                if (color) {
+                    g.fillStyle = color;
                     g.fillRect(x - 1, y, 3, 23);
                 }
 
@@ -335,8 +340,6 @@ class Piano {
     }
 
     reset() {
-        for (let i = 0; i < 127; i++) {
-            this.status[i] = 0;
-        }
+        this.status.fill(-1);
     }
 }
