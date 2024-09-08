@@ -29,7 +29,7 @@ class SimpleMidiSynthesizer {
      * 
      * @param {MidiTrackEvent} e 
      */
-    process_event(e) {
+    async process_event(e) {
         if (e instanceof MetaEvent) {
             switch (e.type) {
                 case 0x51:
@@ -65,7 +65,7 @@ class SimpleMidiSynthesizer {
         }
     }
     _change_patch(chan, patch) {
-        this.channels[chan].buffer = this._sb.getBuffer(patch);
+        this.channels[chan].buffer = this._sb.getBuffer(this.channels[chan].patch = patch);
     }
     _change_control(chan, control, value) {
         switch (control) {

@@ -57,7 +57,7 @@ document.getElementById("filein").addEventListener("change", async e => {
         a_status.innerText = "Parsing file...";
         seq = Midifile.parse(buf);
         console.log(seq);
-        if (sms != null && sms.isPlaying()) {
+        if (sms && sms.playing) {
             sms.reset();
             sms.stop();
             document.getElementById("cont").innerText = "Play";
@@ -102,18 +102,20 @@ render();
 
 document.getElementById("reset").addEventListener("click", e => {
     sms.reset();
-    render();
+    update_status();
+    if (!sms.playing)
+        render();
 });
 
 document.getElementById("cont").addEventListener("click", e => {
-    if (sms.isPlaying()) {
+    if (sms.playing) {
         // sms.reset();
         sms.stop();
     } else {
         sms.start();
         render();
     }
-    e.target.innerText = sms.isPlaying() ? "Stop" : "Play";
+    e.target.innerText = sms.playing ? "Stop" : "Play";
 });
 
 document.querySelector("input#volume").addEventListener("input", e => {
@@ -124,7 +126,7 @@ document.querySelector("input#volume").addEventListener("input", e => {
 
 document.querySelector("input#speed").addEventListener("input", e => {
     let val = e.target.valueAsNumber;
-    if (sms != null)
+    if (sms)
         sms.speed = val;
     document.querySelector("a#speed").innerText = `${parseInt(val*100)}%`
 });

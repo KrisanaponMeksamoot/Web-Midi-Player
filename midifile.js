@@ -265,19 +265,19 @@ class SimpleMidiSequencer extends EventTarget {
     reset() {
         this.event_pos.fill(0);
         this.event_tl.fill(0);
-        this.currentInterval = 60000/this.seq.division/120;
-        this.status.bpm = 0;
+        this._st = Date.now();
+        this._ndt = 0;
+        this.status.bpm = 120;
+        this.currentInterval = 60000/this.seq.division/this.status.bpm;
         this._last_update_tick_pos = 0;
         this._time_after_tp = 0;
-    }
-    isPlaying() {
-        return this.playing;
     }
     stop() {
         this.playing = false;
         clearTimeout(this.loop_timeout);
         this.loop_timeout = -1;
-        let tp = this.currentTick - this._last_update_tick_pos;
+        let tp = Math.min(this.currentTick - this._last_update_tick_pos, this._ndt);
+        this._time_after_tp = tp * this.currentInterval / this.speed;
         for (let i in this.event_tl) {
             this.event_tl[i] -= tp;
         }
