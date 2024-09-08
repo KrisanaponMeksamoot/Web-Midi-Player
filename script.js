@@ -63,6 +63,7 @@ document.getElementById("filein").addEventListener("change", async e => {
             document.getElementById("cont").innerText = "Play";
         }
         sms = new SimpleMidiSequencer(seq, synthesizer);
+        document.title = `${file.name} - Midi Player`;
         sms.speed = document.querySelector("input#speed").valueAsNumber;
         sms.addEventListener("ended", ()=>document.getElementById("cont").innerText = "Play")
         sms.addEventListener("tickupdate", update_status);
