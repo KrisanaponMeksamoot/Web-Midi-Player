@@ -1,13 +1,13 @@
 var a_status = document.getElementById("status");
 
 var seq = null;
-// var sf = null;
 /**
  * @type {SimpleMidiSequencer}
  */
 var sms = null;
 var actx = new AudioContext({sampleRate: 44100});
-var sb;
+var synthesizer = new SimpleMidiSynthesizer(actx);
+synthesizer.gnode.gain.value = document.querySelector("input#volume").valueAsNumber;
 
 /**
  * @type {HTMLCanvasElement}
@@ -45,7 +45,7 @@ canvas.height = fallingNotes.height + fallingNotes.piano.height;
         })());
     }
     await Promise.all(arr);
-    sb = new SoundBank(bufs);
+    synthesizer.soundbank = new SoundBank(bufs);
     a_status.innerText ="";
 })();
 
@@ -62,12 +62,10 @@ document.getElementById("filein").addEventListener("change", async e => {
             sms.stop();
             document.getElementById("cont").innerText = "Play";
         }
-        sms = new SimpleMidiSequencer(seq, sb, actx);
-        sms.gnode.gain.value = document.querySelector("input#volume").valueAsNumber;
+        sms = new SimpleMidiSequencer(seq, synthesizer);
         sms.speed = document.querySelector("input#speed").valueAsNumber;
         sms.addEventListener("ended", ()=>document.getElementById("cont").innerText = "Play")
         sms.addEventListener("tickupdate", update_status);
-        sms.addEventListener("bpmchange", update_status);
         update_status();
         fallingNotes.piano.player = sms;
         fallingNotes.piano.noteMap = new NoteMap(seq);
@@ -102,9 +100,14 @@ render();
 //     console.log(sf);
 // });
 
+document.getElementById("reset").addEventListener("click", e => {
+    sms.reset();
+    render();
+});
+
 document.getElementById("cont").addEventListener("click", e => {
     if (sms.isPlaying()) {
-        sms.reset();
+        // sms.reset();
         sms.stop();
     } else {
         sms.start();
@@ -115,8 +118,7 @@ document.getElementById("cont").addEventListener("click", e => {
 
 document.querySelector("input#volume").addEventListener("input", e => {
     let val = e.target.valueAsNumber;
-    if (sms != null)
-        sms.gnode.gain.value = val;
+    synthesizer.gnode.gain.value = val;
     document.querySelector("a#volume").innerText = `${parseInt(val*100)}%`
 });
 

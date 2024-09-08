@@ -183,34 +183,24 @@ class MidiMulformError extends Error {
     }
 }
 
-class SoundBank {
-    constructor(buffers = Array(127)) {
-        this.buffers = buffers;
-    }
-    getBuffer(num) {
-        return this.buffers[num];
-    }
-}
-
 class SimpleMidiSequencer extends EventTarget {
     /**
      * @param {MidiSequence} sequence
-     * @param {SoundBank} soundbank
+     * @param {SimpleMidiSynthesizer} synthesizer
      */
-    constructor(sequence, soundbank, actx = new AudioContext()) {
+    constructor(sequence, synthesizer = new SimpleMidiSynthesizer()) {
         super();
         this.class = SimpleMidiSequencer;
         this.seq = sequence;
-        this.loop_timeout = -1;
+        this.synthesizer = synthesizer;
+        
         this.event_pos = Array(this.seq.tracks.length).fill(0);
         this.event_tl = Array(this.seq.tracks.length).fill(0);
-        this.sb = soundbank;
-        this.actx = actx;
         this.speed = 1;
-        this.gnode = this.actx.createGain();
-        this.gnode.connect(this.actx.destination);
-        this.channels = Array(16).fill(null).map(_=>new this.class.AudioChannel(this.actx, soundbank.getBuffer(0), this.gnode));
+
+        this.loop_timeout = -1;
         this._last_update_tick_pos = 0;
+        this._time_after_tp = 0;
         this.currentInterval = 0;
         this.status = {
             bpm: 0
@@ -228,7 +218,7 @@ class SimpleMidiSequencer extends EventTarget {
             if (this.event_tl[i] > 0)
                 continue;
             do
-                this._process_event(this.seq.tracks[i].events[this.event_pos[i]++]);
+                this.synthesizer.process_event(this.seq.tracks[i].events[this.event_pos[i]++]);
             while (this.event_pos[i] < this.seq.tracks[i].events.length && this.seq.tracks[i].events[this.event_pos[i]].dt == 0);
             if (this.event_pos[i] >= this.seq.tracks[i].events.length) {
                 tl--;
@@ -242,17 +232,21 @@ class SimpleMidiSequencer extends EventTarget {
     }
     async _run() {
         this._st = Date.now();
-        while (this.playing && this._tick()) {
+        while (this.playing) {
             this._ndt = Math.min(...this.event_tl);
             for (let i in this.event_tl)
                 this.event_tl[i] -= this._ndt;
             this.dispatchEvent(new Event("tickupdate"));
             let ct = Date.now();
+            this.currentInterval = this.synthesizer.tick_delay/1000/this.seq.division;
+            this.status.bpm = 60000000/this.synthesizer.tick_delay;
             let dt = this.currentInterval * this._ndt / this.speed;// - (ct - this._st);
             this._st = ct;
             if (dt > 0)
                 this.loop_timeout = await new Promise((res)=>setTimeout(res, dt));
             this._last_update_tick_pos += this._ndt;
+            if (!this._tick())
+                break;
         }
         if (this.playing) {
             this.stop();
@@ -260,82 +254,11 @@ class SimpleMidiSequencer extends EventTarget {
         }
     }
     get currentTick() {
-        if (!this.playing)
-            return this._last_update_tick_pos;
-        return this._last_update_tick_pos + parseInt((Date.now() - this._st) * this.speed / this.currentInterval);
-    }
-    /**
-     * 
-     * @param {MidiTrackEvent} e 
-     */
-    _process_event(e) {
-        if (e instanceof MetaEvent) {
-            switch (e.type) {
-                case 0x51:
-                    let len = (e.data[0]<<16 | e.data[1]<<8 | e.data[2]);
-                    this.currentInterval = len/1000/this.seq.division;
-                    this.status.bpm = 60000000/len;
-                    this.dispatchEvent(new Event("bpmchange"));
-                    break;
-            }
-        } else if (e instanceof MidiEvent) {
-            switch (e.status & 0xF0) {
-                case 0x80:
-                    this._stop_sound(e.status & 0x0F, e.data, e.data2);
-                    break;
-                case 0x90:
-                case 0xA0:
-                    this._play_sound(e.status & 0x0F, e.data, e.data2);
-                    break;
-                case 0xB0:
-                    this._change_control(e.status & 0x0F, e.data, e.data2);
-                    break;
-                case 0xC0:
-                    this._change_patch(e.status & 0x0F, e.data);
-                    break;
-                case 0xD0:
-                    let mx = 0;
-                    let kys = this.channels[e.status & 0x0F].map(a=>a==null?0:a.volume);
-                    for (let i in kys)
-                        if (kys[i] > kys[mx])
-                            mx = i;
-                    this._play_sound(e.status & 0x0F, mx, e.data);
-                    break;
-                default:
-                    console.warn(`Unimplemented midi-event: 0x${e.status.toString(16)}`);
-            }
-        }
-    }
-    _change_patch(chan, patch) {
-        this.channels[chan].buffer = this.sb.getBuffer(patch);
-    }
-    _change_control(chan, control, value) {
-        switch (control) {
-            case 0x7:
-            case 0x27:
-                this.channels[chan].gnode.gain.value = value/127;
-                break;
-            case 0x40:
-                this.channels[chan].damper = value > 63;
-                break;
-            case 0x79:
-                this.channels.forEach(ch=>ch.reset());
-                break;
-            case 0x7B:
-                this.channels.forEach(ch=>ch.stopAll());
-                break;
-            default:
-                console.warn(`Unimplemented control change: 0x${control.toString(16)}`);
-        }
-    }
-    _play_sound(chan, key, vel) {
-        this.channels[chan].getNode(key).play(vel/127);
-    }
-    _stop_sound(chan, key, vel) {
-        this.channels[chan].getNode(key).stop();
+        if (this.playing)
+            this._time_after_tp = Date.now() - this._st;
+        return this._last_update_tick_pos + (parseInt(this._time_after_tp * this.speed / this.currentInterval) || 0);
     }
     start() {
-        this.reset();
         this.playing = true;
         this._run();
     }
@@ -345,93 +268,18 @@ class SimpleMidiSequencer extends EventTarget {
         this.currentInterval = 60000/this.seq.division/120;
         this.status.bpm = 0;
         this._last_update_tick_pos = 0;
+        this._time_after_tp = 0;
     }
     isPlaying() {
         return this.playing;
     }
     stop() {
+        this.playing = false;
         clearTimeout(this.loop_timeout);
         this.loop_timeout = -1;
-        this.playing = false;
+        let tp = this.currentTick - this._last_update_tick_pos;
+        for (let i in this.event_tl) {
+            this.event_tl[i] -= tp;
+        }
     }
-    static AudioChannel = class AudioChannel {
-        /**
-         * @param {BaseAudioContext} actx 
-         * @param {AudioBuffer} buffer 
-         */
-        constructor(actx, buffer, destination = actx.destination) {
-            this.class = AudioChannel;
-            this.actx = actx;
-            this.buffer = buffer;
-            this.nodes = Array(127).fill(null);
-            this.gnode = this.actx.createGain();
-            this.gnode.connect(destination);
-
-            this._damper = false;
-        }
-        getNode(note) {
-            if (this.nodes[note] == null)
-                this.nodes[note] = new this.class.AudioNode(this, Math.min(Math.max(Math.pow(2, (note-this.buffer.basePitch)/12), 0.0625), 128));
-            return this.nodes[note];
-        }
-        static AudioNode = class AudioNode {
-            /**
-             * @param {AudioChannel} channel 
-             * @param {number} pbrate 
-             */
-            constructor(channel, pbrate = 1) {
-                this.channel = channel;
-                this.pbrate = pbrate;
-                this.gnode = this.channel.actx.createGain();
-                this.gnode.connect(this.channel.gnode);
-                this.bs = null;
-
-                this.playing = false;
-            }
-            play(vol = 1) {
-                this.playing = true;
-                if (this.bs != null)
-                    this.bs.stop();
-                this.bs = this.channel.actx.createBufferSource();
-                this.bs.connect(this.gnode);
-                this.gnode.gain.value = vol;
-                this.bs.playbackRate.value = this.pbrate;
-                this.bs.buffer = this.channel.buffer;
-                this.bs.start();
-            }
-            stop() {
-                if (!this.playing) return;
-                this.playing = false;
-                if (!this.channel._damper)
-                    this.bs.stop();
-            }
-        };
-        set damper(press) {
-            this._damper = press;
-            if (!this._damper)
-                this.nodes.forEach(an=>{
-                    if (an == null) return;
-                    if (!an.playing)
-                        an.stop();
-                });
-        }
-
-        get damper() {
-            return this._damper;
-        }
-
-        reset() {
-            this.nodes.forEach(an=>{
-                if (an == null) return;
-                an.gnode.gain.value = 1;
-            });
-            this.gnode.gain.value = 1;
-
-            this.damper = false;
-        }
-
-        stopAll() {
-            this.nodes.forEach(an=>an.stop());
-        }
-    };
 }
