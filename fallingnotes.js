@@ -52,7 +52,7 @@ class NoteMap {
                 this.notes_range_count++;
             }
         }
-        this.notes = notes.sort(Note.compareByChannel);
+        this.notes = notes.sort(Note.compare);
     }
 
     /**
@@ -61,7 +61,7 @@ class NoteMap {
      * @param {number} time 
      */
     notesAt(notes, time) {
-        let currentNotei = binarySearchCeil(this.notes, new Note(0, time, 0), Note.compareByChannel);
+        let currentNotei = binarySearchCeil(this.notes, new Note(255, time, 255), Note.compare);
         let currentNote = this.notes[currentNotei];
         let ns = Array(127).fill(false);
         let count = 0;
@@ -78,7 +78,7 @@ class NoteMap {
     }
 
     noteBefore(end) {
-        return this.notes.slice(0, binarySearchFloor(this.notes, new Note(255, end, 255), Note.compareByChannel));
+        return this.notes.slice(0, binarySearchFloor(this.notes, new Note(255, end, 255), Note.compare));
     }
 
     static NoteEvent = class NoteEvent {
