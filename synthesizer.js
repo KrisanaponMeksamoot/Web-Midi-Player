@@ -1,12 +1,3 @@
-class SoundBank {
-    constructor(buffers = Array(127)) {
-        this.buffers = buffers;
-    }
-    getBuffer(num) {
-        return this.buffers[num];
-    }
-}
-
 class SimpleMidiSynthesizer {
     constructor(actx = new AudioContext(), soundbank = new SoundBank()) {
         this.class = SimpleMidiSynthesizer;

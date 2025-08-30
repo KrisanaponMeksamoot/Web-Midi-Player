@@ -6,7 +6,7 @@ var seq = null;
  */
 var sms = null;
 var actx = new AudioContext({sampleRate: 44100});
-var synthesizer = new SimpleMidiSynthesizer(actx);
+var synthesizer = new TonejsMidiSynthesizer(actx);
 synthesizer.gnode.gain.value = document.querySelector("input#volume").valueAsNumber;
 
 /**
